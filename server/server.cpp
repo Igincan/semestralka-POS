@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string>
 
 int main()
 {
@@ -44,7 +45,7 @@ int main()
         return 3;
     }
 
-    while (strcmp(buffer, "exit"))
+    while (std::string(buffer) != "exit\n")
     {
         memset(buffer, 0, 256);
         n = read(new_socket_fd, buffer, 255);

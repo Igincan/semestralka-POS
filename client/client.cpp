@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <string>
 
 int main()
 {
@@ -45,7 +46,7 @@ int main()
         return 3;
     }
 
-    while (strcmp(buffer, "exit"))
+    while (std::string(buffer) != "exit\n")
     {
         memset(buffer, 0, 256);
         std::cout << "Client: ";
