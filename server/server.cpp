@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string>
+#include <thread>
+#include <vector>
 
 int main()
 {
@@ -15,6 +17,8 @@ int main()
     socklen_t client_length = sizeof(client_address);
     int n;
     char buffer[256];
+
+    std::vector<std::thread> client_threads;
 
     memset(reinterpret_cast<char*>(&server_address), 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
@@ -38,38 +42,53 @@ int main()
 
     std::cout << "Listening on port: 1500" << std::endl;
 
-    new_socket_fd = accept(socket_fd, reinterpret_cast<struct sockaddr*>(&client_address), &client_length);
-    if (new_socket_fd == -1)
+    while (client_threads.size() < 3)
     {
-        perror("Error accepting socket.");
-        return 3;
-    }
-
-    while (std::string(buffer) != "exit\n")
-    {
-        memset(buffer, 0, 256);
-        n = read(new_socket_fd, buffer, 255);
-        if (n == -1)
+        new_socket_fd = accept(socket_fd, reinterpret_cast<struct sockaddr*>(&client_address), &client_length);
+        if (new_socket_fd == -1)
         {
-            perror("Error reading from socket.");
-            return 4;
+            perror("Error accepting socket.");
+            return 3;
         }
-        std::cout << "Client: " << buffer;
 
-        memset(buffer, 0, 256);
-        std::cout << "Server: ";
-        fgets(buffer, 255, stdin);
-
-        n = write(new_socket_fd, buffer, strlen(buffer) + 1);
-        if (n == -1)
-        {
-            perror("Error writing socket.");
-            return 5;
-        }
+        client_threads.push_back(std::thread([] (int thread_socket_fd) {
+            std::cout << "new connection: " << thread_socket_fd << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+            close(thread_socket_fd);
+        }, new_socket_fd));
     }
 
 
-    close(new_socket_fd);
+    for (std::thread& thread : client_threads)
+    {
+        thread.join();
+    }
+
+    // while (std::string(buffer) != "exit\n")
+    // {
+    //     memset(buffer, 0, 256);
+    //     n = read(new_socket_fd, buffer, 255);
+    //     if (n == -1)
+    //     {
+    //         perror("Error reading from socket.");
+    //         return 4;
+    //     }
+    //     std::cout << "Client: " << buffer;
+
+    //     memset(buffer, 0, 256);
+    //     std::cout << "Server: ";
+    //     fgets(buffer, 255, stdin);
+
+    //     n = write(new_socket_fd, buffer, strlen(buffer) + 1);
+    //     if (n == -1)
+    //     {
+    //         perror("Error writing socket.");
+    //         return 5;
+    //     }
+    // }
+
+
+    // close(new_socket_fd);
     close(socket_fd);
 
     return 0;
