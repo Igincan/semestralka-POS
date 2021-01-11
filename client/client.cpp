@@ -46,29 +46,19 @@ int main()
         return 3;
     }
 
-    // while (std::string(buffer) != "exit\n")
-    // {
-    //     memset(buffer, 0, 256);
-    //     std::cout << "Client: ";
-    //     fgets(buffer, 255, stdin);
+    while (std::string(buffer) != "exit\n")
+    {
+        memset(buffer, 0, 256);
+        std::cout << "Client: ";
+        fgets(buffer, 255, stdin);
 
-    //     n = write(socket_fd, buffer, strlen(buffer));
-    //     if (n == -1)
-    //     {
-    //         perror("Error writing to socket.");
-    //         return 4;
-    //     }
-
-    //     memset(buffer, 0, 256);
-    //     n = read(socket_fd, buffer, 255);
-    //     if (n == -1)
-    //     {
-    //         perror("Error reading from socket.");
-    //         return 5;
-    //     }
-
-    //     std::cout << "Server: " << buffer;
-    // }
+        n = write(socket_fd, buffer, strlen(buffer));
+        if (n == -1)
+        {
+            perror("Error writing to socket.");
+            return 4;
+        }
+    }
 
     close(socket_fd);
     

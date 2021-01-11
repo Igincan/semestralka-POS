@@ -15,8 +15,6 @@ int main()
     int socket_fd, new_socket_fd;
     struct sockaddr_in server_address, client_address;
     socklen_t client_length = sizeof(client_address);
-    int n;
-    char buffer[256];
 
     std::vector<std::thread> client_threads;
 
@@ -52,8 +50,22 @@ int main()
         }
 
         client_threads.push_back(std::thread([] (int thread_socket_fd) {
-            std::cout << "new connection: " << thread_socket_fd << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+
+            int n;
+            char buffer[256];
+
+            while (std::string(buffer) != "exit\n")
+            {
+                memset(buffer, 0, 256);
+                n = read(thread_socket_fd, buffer, 255);
+                if (n == -1)
+                {
+                    perror("Error reading from socket.");
+                    return 4;
+                }
+                std::cout << "Client[" << thread_socket_fd << "]: " << buffer;
+            }
+
             close(thread_socket_fd);
         }, new_socket_fd));
     }
@@ -64,31 +76,6 @@ int main()
         thread.join();
     }
 
-    // while (std::string(buffer) != "exit\n")
-    // {
-    //     memset(buffer, 0, 256);
-    //     n = read(new_socket_fd, buffer, 255);
-    //     if (n == -1)
-    //     {
-    //         perror("Error reading from socket.");
-    //         return 4;
-    //     }
-    //     std::cout << "Client: " << buffer;
-
-    //     memset(buffer, 0, 256);
-    //     std::cout << "Server: ";
-    //     fgets(buffer, 255, stdin);
-
-    //     n = write(new_socket_fd, buffer, strlen(buffer) + 1);
-    //     if (n == -1)
-    //     {
-    //         perror("Error writing socket.");
-    //         return 5;
-    //     }
-    // }
-
-
-    // close(new_socket_fd);
     close(socket_fd);
 
     return 0;
