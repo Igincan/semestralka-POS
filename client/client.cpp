@@ -46,10 +46,24 @@ int main()
         return 3;
     }
 
+    std::cout << "Connected!" << std::endl;
+
+    std::cout << "Waiting for other clients to connect..." << std::endl;
+
+    memset(buffer, 0, 256);
+    n = read(socket_fd, buffer, 255);
+    if (std::string(buffer) != "all_clients_connected")
+    {
+        std::cerr << "Invalid response from server." << std::endl;
+        return 5;
+    }
+
+    std::cout << "All clients connected!" << std::endl;
+
     while (std::string(buffer) != "exit\n")
     {
         memset(buffer, 0, 256);
-        std::cout << "Client: ";
+        std::cout << "> ";
         fgets(buffer, 255, stdin);
 
         n = write(socket_fd, buffer, strlen(buffer));
