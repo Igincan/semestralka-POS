@@ -10,71 +10,89 @@
 
 int main()
 {
-    int socket_fd, n;
-    struct sockaddr_in server_address;
+    // int socket_fd, n;
+    // struct sockaddr_in server_address;
 
-    char buffer[256];
+    // char buffer[256];
 
-    struct hostent* server = gethostbyname("localhost");
-    if (server == nullptr)
+    // struct hostent* server = gethostbyname("localhost");
+    // if (server == nullptr)
+    // {
+    //     std::cerr << "Error, no such host." << std::endl;
+    //     return 1;
+    // }
+
+    // memset(reinterpret_cast<char*>(&server_address), 0, sizeof(server_address));
+    // server_address.sin_family = AF_INET;
+    // memmove(
+    //     reinterpret_cast<char*>(&server_address.sin_addr.s_addr),
+    //     reinterpret_cast<char*>(server->h_addr),
+    //     server->h_length
+    // );
+    // server_address.sin_port = htons(1500);
+
+    // socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    // if (socket_fd == -1)
+    // {
+    //     perror("Error creating socket.");
+    //     return 2;
+    // }
+
+    // std::cout << "Connecting..." << std::endl;
+
+    // if (connect(socket_fd, reinterpret_cast<struct sockaddr*>(&server_address), sizeof(server_address)) == -1)
+    // {
+    //     perror("Error connecting to socket.");
+    //     return 3;
+    // }
+
+    // std::cout << "Connected!" << std::endl;
+
+    // std::cout << "Waiting for other clients to connect..." << std::endl;
+
+    // memset(buffer, 0, 256);
+    // n = read(socket_fd, buffer, 255);
+    // if (std::string(buffer) != "all_clients_connected")
+    // {
+    //     std::cerr << "Invalid response from server." << std::endl;
+    //     return 5;
+    // }
+
+    // std::cout << "All clients connected!" << std::endl;
+
+    unsigned fieldSize = 20;
+    char field[fieldSize][fieldSize];
+    memset(field, '.', fieldSize * fieldSize);
+    field[2][0] = '#';
+    field[2][1] = '#';
+    field[2][2] = '#';
+
+    for (unsigned y = 0; y < fieldSize; y++)
     {
-        std::cerr << "Error, no such host." << std::endl;
-        return 1;
-    }
-
-    memset(reinterpret_cast<char*>(&server_address), 0, sizeof(server_address));
-    server_address.sin_family = AF_INET;
-    memmove(
-        reinterpret_cast<char*>(&server_address.sin_addr.s_addr),
-        reinterpret_cast<char*>(server->h_addr),
-        server->h_length
-    );
-    server_address.sin_port = htons(1500);
-
-    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_fd == -1)
-    {
-        perror("Error creating socket.");
-        return 2;
-    }
-
-    std::cout << "Connecting..." << std::endl;
-
-    if (connect(socket_fd, reinterpret_cast<struct sockaddr*>(&server_address), sizeof(server_address)) == -1)
-    {
-        perror("Error connecting to socket.");
-        return 3;
-    }
-
-    std::cout << "Connected!" << std::endl;
-
-    std::cout << "Waiting for other clients to connect..." << std::endl;
-
-    memset(buffer, 0, 256);
-    n = read(socket_fd, buffer, 255);
-    if (std::string(buffer) != "all_clients_connected")
-    {
-        std::cerr << "Invalid response from server." << std::endl;
-        return 5;
-    }
-
-    std::cout << "All clients connected!" << std::endl;
-
-    while (std::string(buffer) != "exit\n")
-    {
-        memset(buffer, 0, 256);
-        std::cout << "> ";
-        fgets(buffer, 255, stdin);
-
-        n = write(socket_fd, buffer, strlen(buffer));
-        if (n == -1)
+        for (unsigned x = 0; x < fieldSize; x++)
         {
-            perror("Error writing to socket.");
-            return 4;
+            std::cout << field[x][y] << field[x][y];
         }
+        std::cout << std::endl;
     }
+    
 
-    close(socket_fd);
+
+    // while (std::string(buffer) != "exit\n")
+    // {
+    //     memset(buffer, 0, 256);
+    //     std::cout << "> ";
+    //     fgets(buffer, 255, stdin);
+
+    //     n = write(socket_fd, buffer, strlen(buffer));
+    //     if (n == -1)
+    //     {
+    //         perror("Error writing to socket.");
+    //         return 4;
+    //     }
+    // }
+
+    // close(socket_fd);
     
     return 0;
 }
