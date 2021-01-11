@@ -29,6 +29,8 @@ struct client_data
 
 int main()
 {
+    srand(time(nullptr));
+
     int socket_fd, new_socket_fd;
     struct sockaddr_in server_address, client_address;
     socklen_t client_length = sizeof(client_address);
@@ -104,17 +106,39 @@ int main()
             memset(buffer, 0, 256);
             const char* msg = "all_clients_connected";
             n = write(thread_data->client_socket_fd, msg, strlen(msg) + 1);
-            
-            while (std::string(buffer) != "exit\n")
+            if (n == -1)
             {
-                memset(buffer, 0, 256);
-                n = read(thread_data->client_socket_fd, buffer, 255);
+                perror("Error writing to socket.");
+                return 5;
+            }
+
+            unsigned fieldSize = 20;
+            char field[fieldSize][fieldSize];
+            
+            char input;
+
+            while (input != 'q')
+            {
+                n = read(thread_data->client_socket_fd, &input, sizeof(input));
                 if (n == -1)
                 {
                     perror("Error reading from socket.");
                     return 4;
                 }
-                std::cout << "client[" << thread_data->client_socket_fd << "]: " << buffer;
+
+                memset(field, '.', fieldSize * fieldSize);
+                field[rand() % fieldSize][rand() % fieldSize] = '#';
+                n = write(thread_data->client_socket_fd, field, fieldSize * fieldSize);
+                if (n == -1)
+                {
+                    perror("Error writing to socket.");
+                    return 5;
+                }
+                if (input != ' ')
+                {
+                    std::cout << "client[" << thread_data->client_socket_fd << "]: " << input << std::endl;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // nemoze byt tu sleep musi byt v hlavnom threade a tu musi byt wait na ten sleep
             }
 
             close(thread_data->client_socket_fd);
