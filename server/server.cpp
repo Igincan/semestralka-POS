@@ -18,6 +18,7 @@ struct client_common_data
 
     std::mutex mutex;
     std::condition_variable all_clients_connected;
+    std::condition_variable tick_passed;
 };
 
 struct client_data
@@ -119,13 +120,7 @@ int main()
 
             while (input != 'q')
             {
-                n = read(thread_data->client_socket_fd, &input, sizeof(input));
-                if (n == -1)
-                {
-                    perror("Error reading from socket.");
-                    return 4;
-                }
-
+                // write
                 memset(field, '.', fieldSize * fieldSize);
                 field[rand() % fieldSize][rand() % fieldSize] = '#';
                 n = write(thread_data->client_socket_fd, field, fieldSize * fieldSize);
@@ -134,14 +129,33 @@ int main()
                     perror("Error writing to socket.");
                     return 5;
                 }
-                if (input != ' ')
+
+                // read
+                n = read(thread_data->client_socket_fd, &input, sizeof(input));
+                if (n == -1)
                 {
+                    perror("Error reading from socket.");
+                    return 4;
+                }
+                if (input == 'w' || input == 'a' || input == 's' || input == 'd' || input == 'q')
+                {
+                    // handling input
                     std::cout << "client[" << thread_data->client_socket_fd << "]: " << input << std::endl;
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // nemoze byt tu sleep musi byt v hlavnom threade a tu musi byt wait na ten sleep
+
+                {
+                    std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                    thread_data->common_data->tick_passed.wait(lock);
+                }
             }
 
             close(thread_data->client_socket_fd);
+
+            {
+                std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                thread_data->common_data->clients_connected--;
+            }
+
         }, &client_datas[client_threads.size()]));
 
         std::cout << "Client connected (" << client_threads.size() << "/2)" << std::endl;
@@ -152,6 +166,20 @@ int main()
         client_common_data.all_clients_connected.notify_all();
     }
     std::cout << "All clients connected!" << std::endl;
+
+    // main cycle
+    while (true)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        {
+            std::unique_lock<std::mutex> lock(client_common_data.mutex);
+            client_common_data.tick_passed.notify_all();
+            if (client_common_data.clients_connected == 0)
+            {
+                break;
+            }
+        }
+    }
 
 
     for (std::thread& thread : client_threads)

@@ -94,6 +94,11 @@ int main()
 
     while(last_pressed_key != 'q')
     {
+        // read
+        memset(field, 0, fieldSize * fieldSize);
+        n = read(socket_fd, field, fieldSize * fieldSize);
+
+        // write
         {
             std::unique_lock<std::mutex> lock(input_data.mutex);
             last_pressed_key = input_data.last_pressed_key;
@@ -104,15 +109,12 @@ int main()
             perror("Error writing to socket.");
             return 4;
         }
-
         {
             std::unique_lock<std::mutex> lock(input_data.mutex);
             input_data.last_pressed_key = ' ';
         }
 
-        memset(field, 0, fieldSize * fieldSize);
-        n = read(socket_fd, field, fieldSize * fieldSize);
-
+        // handling data
         std::cout << std::endl << std::endl << std::endl << std::endl;
         for (unsigned y = 0; y < fieldSize; y++)
         {
