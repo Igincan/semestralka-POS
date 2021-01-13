@@ -71,8 +71,6 @@ int main()
 
     unsigned fieldSize = 20;
     char field[fieldSize][fieldSize];
-    int pohyb = 1;
-    int pohyb2 = 18;
 
     struct input_data input_data =
     {
