@@ -3,14 +3,8 @@
         {
             "type": "cppbuild",
             "label": "C/C++: g++ build",
-            "command": "/usr/bin/g++",
-            "args": [
-                "-g",
-                "*.cpp",
-                "-o",
-                "client",
-                "-lpthread"
-            ],
+            "command": "make",
+            "args": [],
             "options": {
                 "cwd": "${workspaceFolder}"
             },

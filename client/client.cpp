@@ -17,14 +17,22 @@ struct input_data
     std::mutex mutex;
 };
 
-int main()
+int main(int argc, char const* argv[])
 {
+
+    if (argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " [host_name]" << std::endl;
+        return 6;
+    }
+    const char* host_name = argv[1];
+
     int socket_fd, n;
     struct sockaddr_in server_address;
 
     char buffer[256];
 
-    struct hostent* server = gethostbyname("localhost");
+    struct hostent* server = gethostbyname(host_name);
     if (server == nullptr)
     {
         std::cerr << "Error, no such host." << std::endl;
@@ -74,7 +82,7 @@ int main()
 
     struct input_data input_data =
     {
-        0
+        ' '
     };
 
     std::thread input_thread([] (struct input_data* thread_data) {
@@ -94,10 +102,6 @@ int main()
 
     while(last_pressed_key != 'q')
     {
-        // read
-        memset(field, 0, fieldSize * fieldSize);
-        n = read(socket_fd, field, fieldSize * fieldSize);
-
         // write
         {
             std::unique_lock<std::mutex> lock(input_data.mutex);
@@ -114,6 +118,10 @@ int main()
             input_data.last_pressed_key = ' ';
         }
 
+        // read
+        memset(field, 0, fieldSize * fieldSize);
+        n = read(socket_fd, field, fieldSize * fieldSize);
+
         // handling data
         std::cout << std::endl << std::endl << std::endl << std::endl;
 
@@ -127,13 +135,9 @@ int main()
             std::cout << "|";
             for (unsigned x = 0; x < fieldSize; x++)
             {
-                if (field[x][y] == '.') {
-                    field[x][y] = ' ';                      // playground
-                }
                 std::cout << field[x][y] << field[x][y];
             }
-            std::cout << "|";
-            std::cout << std::endl;
+            std::cout << "|" << std::endl;
         }
         std::cout << " -";                          // bottom border gen.
         for (int i = 0; i < fieldSize*2 - 1; ++i) {

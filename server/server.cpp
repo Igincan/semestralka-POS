@@ -16,25 +16,35 @@
 
 #define FIELD_SIZE 20
 
+struct coordinates
+{
+    unsigned x;
+    unsigned y;
+};
+
+
 struct player_data
 {
     char direction;
-    struct
-    {
-        unsigned x;
-        unsigned y;
-    } head;
+    struct coordinates head;
+    std::vector<struct coordinates> body;
 };
 
 struct common_data
 {
     unsigned clients_connected;
+    unsigned number_of_players;
+    unsigned inputs_handled;
+    unsigned snakes_processed;
+    bool tick_has_passed;
     char field[FIELD_SIZE][FIELD_SIZE];
     std::vector<struct player_data> players_data;
 
     std::mutex mutex;
     std::condition_variable all_clients_connected;
     std::condition_variable tick_passed;
+    std::condition_variable all_inputs_handled;
+    std::condition_variable all_snakes_processed;
 };
 
 struct client_data
@@ -45,9 +55,29 @@ struct client_data
     struct common_data* common_data;
 };
 
-int main()
+int main(int argc, char const* argv[])
 {
     srand(time(nullptr));
+
+    unsigned number_of_players;
+    try
+    {
+        number_of_players = std::stoul(argv[1]);
+    }
+    catch(std::exception& e)
+    {
+        std::cerr << "Usage: " << argv[0] << " [number_of_players]" << std::endl;
+        return 6;
+    }
+
+    if (number_of_players > 10)
+    {
+        number_of_players = 10;
+    }
+    else if (number_of_players < 1)
+    {
+        number_of_players = 1;
+    }
 
     int socket_fd, new_socket_fd;
     struct sockaddr_in server_address, client_address;
@@ -73,23 +103,25 @@ int main()
         return 2;
     }
 
-    listen(socket_fd, 5);
+    listen(socket_fd, number_of_players);
 
     std::cout << "Server is running." << std::endl;
-    std::cout << "Waiting on clients to connect. (0/2)" << std::endl;
-
-    unsigned field_size = 20;
+    std::cout << "Waiting on clients to connect. (0/" << number_of_players << ")" << std::endl;
 
     struct common_data common_data =
     {
-        0      // clients_connected
+        0, // clients_connected
+        number_of_players, // number_of_players
+        0, // inputs_handled
+        0, // snakes_processed
+        false // tick_has_passed
         // field is initialized implicitly
         // players_data is initialized implicitly
         // for mutex and condition variables are used implicit default constructors
     };
 
-    struct client_data client_datas[2];
-    for (unsigned i = 0; i < 2; i++)
+    struct client_data client_datas[number_of_players];
+    for (unsigned i = 0; i < number_of_players; i++)
     {
         client_datas[i] =
         {
@@ -99,7 +131,7 @@ int main()
         };
     }
 
-    while (client_threads.size() < 2)
+    while (client_threads.size() < number_of_players)
     {
         new_socket_fd = accept(socket_fd, reinterpret_cast<struct sockaddr*>(&client_address), &client_length);
         if (new_socket_fd == -1)
@@ -122,7 +154,7 @@ int main()
 
             {
                 std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
-                while (thread_data->common_data->clients_connected < 2)
+                while (thread_data->common_data->clients_connected < thread_data->common_data->number_of_players)
                 {
                     thread_data->common_data->all_clients_connected.wait(lock);
                 }
@@ -140,6 +172,55 @@ int main()
 
             while (input != 'q')
             {
+                {
+                    std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                    thread_data->common_data->tick_has_passed = false;
+                    while (!thread_data->common_data->tick_has_passed)
+                    {
+                        thread_data->common_data->tick_passed.wait(lock);
+                    }
+                }
+                
+                // read
+                n = read(thread_data->client_socket_fd, &input, sizeof(input));
+                if (n == -1)
+                {
+                    perror("Error reading from socket.");
+                    return 4;
+                }
+                if (input >= 'a' && input <= 'z')
+                {
+                    // handling input
+                    if (input == 'w' || input == 'a' || input == 's' || input == 'd')
+                    {
+                        {
+                            std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                            thread_data->common_data->players_data[thread_data->player_index].direction = input;
+                        }
+                        std::cout << "client[" << thread_data->client_socket_fd << "]: <" << input << ">" << std::endl;
+                    }
+                    else if (input == 'q')
+                    {
+                        std::cout << "client[" << thread_data->client_socket_fd << "]: quitting" << std::endl;
+                    }
+                    else
+                    {
+                        std::cout << "client[" << thread_data->client_socket_fd << "]: " << input << std::endl;
+                    }
+                }
+
+                {
+                    std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                    if (++thread_data->common_data->inputs_handled == thread_data->common_data->number_of_players)
+                    {
+                        thread_data->common_data->all_inputs_handled.notify_one();
+                    }
+                    while (thread_data->common_data->snakes_processed < thread_data->common_data->number_of_players)
+                    {
+                        thread_data->common_data->all_snakes_processed.wait(lock);
+                    }
+                }
+
                 // write
                 {
                     std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
@@ -149,32 +230,6 @@ int main()
                 {
                     perror("Error writing to socket.");
                     return 5;
-                }
-
-                // read
-                n = read(thread_data->client_socket_fd, &input, sizeof(input));
-                if (n == -1)
-                {
-                    perror("Error reading from socket.");
-                    return 4;
-                }
-                if (input == 'w' || input == 'a' || input == 's' || input == 'd' || input == 'q')
-                {
-                    // handling input
-                    if (input != 'q')
-                    {
-                        std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
-                        thread_data->common_data->players_data[thread_data->player_index].direction = input;
-                    }
-                    else
-                    {
-                        std::cout << "client[" << thread_data->client_socket_fd << "]: " << "quitting" << std::endl;
-                    }
-                }
-
-                {
-                    std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
-                    thread_data->common_data->tick_passed.wait(lock);
                 }
             }
 
@@ -187,7 +242,7 @@ int main()
 
         }, &client_datas[client_threads.size()]));
 
-        std::cout << "Client connected (" << client_threads.size() << "/2)" << std::endl;
+        std::cout << "Client connected (" << client_threads.size() << '/' << number_of_players << ')' << std::endl;
     }
 
     {
@@ -201,17 +256,32 @@ int main()
 
     {
         std::unique_lock<std::mutex> lock(common_data.mutex);
-        common_data.players_data.push_back(
+        for (unsigned i = 0; i < number_of_players; i++)
         {
-            's',
-            { 4, 4 }
-        });
-        common_data.players_data.push_back(
-        {
-            'w',
-            { 15, 15 }
-        });
-        memset(common_data.field, '.', pow(FIELD_SIZE, 2));
+            char direction;
+            switch (rand() % 4)
+            {
+            case 0:
+                direction = 'w';
+                break;
+            case 1:
+                direction = 'a';
+                break;
+            case 2:
+                direction = 's';
+                break;
+            case 3:
+                direction = 'd';
+                break;
+            }
+            common_data.players_data.push_back(
+            {
+                direction,
+                { rand() % FIELD_SIZE, rand() % FIELD_SIZE }
+            });
+        }
+
+        memset(common_data.field, ' ', pow(FIELD_SIZE, 2));
         for (unsigned i = 0; i < common_data.players_data.size(); i++)
         {
             common_data.field[common_data.players_data[i].head.x][common_data.players_data[i].head.y] = 49 + i;
@@ -221,15 +291,24 @@ int main()
     // main cycle
     while (true)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         {
             std::unique_lock<std::mutex> lock(common_data.mutex);
 
+            common_data.snakes_processed = 0;
+            common_data.tick_has_passed = true;
+            common_data.tick_passed.notify_all();
+            while (common_data.inputs_handled < common_data.number_of_players)
+            {
+                common_data.all_inputs_handled.wait(lock);
+            }
+            common_data.inputs_handled = 0;
+
             for (unsigned i = 0; i < common_data.players_data.size(); i++)
             {
                 struct player_data& player_data = common_data.players_data[i];
-                common_data.field[player_data.head.x][player_data.head.y] = '.';
+                common_data.field[player_data.head.x][player_data.head.y] = ' ';
                 switch (player_data.direction)
                 {
                 case 'w':
@@ -276,8 +355,9 @@ int main()
                 common_data.field[player_data.head.x][player_data.head.y] = 49 + i;
             }
 
+            common_data.snakes_processed = common_data.number_of_players;
+            common_data.all_snakes_processed.notify_all();
 
-            common_data.tick_passed.notify_all();
             if (common_data.clients_connected == 0)
             {
                 break;
