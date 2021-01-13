@@ -71,6 +71,7 @@ int main()
 
     unsigned fieldSize = 20;
     char field[fieldSize][fieldSize];
+    char border[4*fieldSize];
 
     struct input_data input_data =
     {
@@ -113,14 +114,28 @@ int main()
         memset(field, 0, fieldSize * fieldSize);
         n = read(socket_fd, field, fieldSize * fieldSize);
 
+
+
         std::cout << std::endl << std::endl << std::endl << std::endl;
+        std::cout << " -";
+        for (int i = 0; i < fieldSize*2 - 1; ++i) {
+            std::cout << "-";
+        }
+        std::cout << std::endl;
         for (unsigned y = 0; y < fieldSize; y++)
         {
+            std::cout << "|";
             for (unsigned x = 0; x < fieldSize; x++)
             {
+                field[x][y] = ' ';
                 std::cout << field[x][y] << field[x][y];
             }
+            std::cout << "|";
             std::cout << std::endl;
+        }
+        std::cout << " -";
+        for (int i = 0; i < fieldSize*2 - 1; ++i) {
+            std::cout << "-";
         }
     }
 
