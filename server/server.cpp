@@ -1,4 +1,3 @@
-#include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -6,15 +5,32 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
+
+#include <iostream>
 #include <string>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 #include <vector>
 
-struct client_common_data
+#define FIELD_SIZE 20
+
+struct player_data
+{
+    char direction;
+    struct
+    {
+        unsigned x;
+        unsigned y;
+    } head;
+};
+
+struct common_data
 {
     unsigned clients_connected;
+    char field[FIELD_SIZE][FIELD_SIZE];
+    std::vector<struct player_data> players_data;
 
     std::mutex mutex;
     std::condition_variable all_clients_connected;
@@ -24,8 +40,9 @@ struct client_common_data
 struct client_data
 {
     int client_socket_fd;
+    unsigned player_index;
 
-    struct client_common_data* common_data;
+    struct common_data* common_data;
 };
 
 int main()
@@ -61,9 +78,13 @@ int main()
     std::cout << "Server is running." << std::endl;
     std::cout << "Waiting on clients to connect. (0/2)" << std::endl;
 
-    struct client_common_data client_common_data =
+    unsigned field_size = 20;
+
+    struct common_data common_data =
     {
-        0
+        0      // clients_connected
+        // field is initialized implicitly
+        // players_data is initialized implicitly
         // for mutex and condition variables are used implicit default constructors
     };
 
@@ -73,7 +94,8 @@ int main()
         client_datas[i] =
         {
             0,
-            &client_common_data
+            i,
+            &common_data
         };
     }
 
@@ -87,9 +109,10 @@ int main()
         }
 
         client_datas[client_threads.size()].client_socket_fd = new_socket_fd;
+
         {
-            std::unique_lock<std::mutex> lock(client_common_data.mutex);
-            client_common_data.clients_connected++;
+            std::unique_lock<std::mutex> lock(common_data.mutex);
+            common_data.clients_connected++;
         }
 
         client_threads.push_back(std::thread([] (struct client_data* thread_data) {
@@ -113,17 +136,15 @@ int main()
                 return 5;
             }
 
-            unsigned fieldSize = 20;
-            char field[fieldSize][fieldSize];
-            
             char input;
 
             while (input != 'q')
             {
                 // write
-                memset(field, '.', fieldSize * fieldSize);
-                field[rand() % fieldSize][rand() % fieldSize] = '#';
-                n = write(thread_data->client_socket_fd, field, fieldSize * fieldSize);
+                {
+                    std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                    n = write(thread_data->client_socket_fd, thread_data->common_data->field, pow(FIELD_SIZE, 2));
+                }
                 if (n == -1)
                 {
                     perror("Error writing to socket.");
@@ -140,7 +161,15 @@ int main()
                 if (input == 'w' || input == 'a' || input == 's' || input == 'd' || input == 'q')
                 {
                     // handling input
-                    std::cout << "client[" << thread_data->client_socket_fd << "]: " << input << std::endl;
+                    if (input != 'q')
+                    {
+                        std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
+                        thread_data->common_data->players_data[thread_data->player_index].direction = input;
+                    }
+                    else
+                    {
+                        std::cout << "client[" << thread_data->client_socket_fd << "]: " << "quitting" << std::endl;
+                    }
                 }
 
                 {
@@ -162,19 +191,94 @@ int main()
     }
 
     {
-        std::unique_lock<std::mutex> lock(client_common_data.mutex);
-        client_common_data.all_clients_connected.notify_all();
+        std::unique_lock<std::mutex> lock(common_data.mutex);
+        common_data.all_clients_connected.notify_all();
     }
     std::cout << "All clients connected!" << std::endl;
+
+    // game logic
+    // initialization
+
+    {
+        std::unique_lock<std::mutex> lock(common_data.mutex);
+        common_data.players_data.push_back(
+        {
+            's',
+            { 4, 4 }
+        });
+        common_data.players_data.push_back(
+        {
+            'w',
+            { 15, 15 }
+        });
+        memset(common_data.field, '.', pow(FIELD_SIZE, 2));
+        for (unsigned i = 0; i < common_data.players_data.size(); i++)
+        {
+            common_data.field[common_data.players_data[i].head.x][common_data.players_data[i].head.y] = 49 + i;
+        }
+    }
 
     // main cycle
     while (true)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
         {
-            std::unique_lock<std::mutex> lock(client_common_data.mutex);
-            client_common_data.tick_passed.notify_all();
-            if (client_common_data.clients_connected == 0)
+            std::unique_lock<std::mutex> lock(common_data.mutex);
+
+            for (unsigned i = 0; i < common_data.players_data.size(); i++)
+            {
+                struct player_data& player_data = common_data.players_data[i];
+                common_data.field[player_data.head.x][player_data.head.y] = '.';
+                switch (player_data.direction)
+                {
+                case 'w':
+                    if (player_data.head.y != 0)
+                    {
+                        player_data.head.y--;
+                    }
+                    else
+                    {
+                        player_data.head.y = FIELD_SIZE - 1;
+                    }
+                    break;
+                case 'a':
+                    if (player_data.head.x != 0)
+                    {
+                        player_data.head.x--;
+                    }
+                    else
+                    {
+                        player_data.head.x = FIELD_SIZE - 1;
+                    }
+                    break;
+                case 's':
+                    if (player_data.head.y != FIELD_SIZE - 1)
+                    {
+                        player_data.head.y++;
+                    }
+                    else
+                    {
+                        player_data.head.y = 0;
+                    }
+                    break;
+                case 'd':
+                    if (player_data.head.x != FIELD_SIZE - 1)
+                    {
+                        player_data.head.x++;
+                    }
+                    else
+                    {
+                        player_data.head.x = 0;
+                    }
+                    break;
+                }
+                common_data.field[player_data.head.x][player_data.head.y] = 49 + i;
+            }
+
+
+            common_data.tick_passed.notify_all();
+            if (common_data.clients_connected == 0)
             {
                 break;
             }
