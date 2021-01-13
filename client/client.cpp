@@ -117,7 +117,8 @@ int main()
 
 
         std::cout << std::endl << std::endl << std::endl << std::endl;
-        std::cout << " -";
+
+        std::cout << " -";                             // top border gen.
         for (int i = 0; i < fieldSize*2 - 1; ++i) {
             std::cout << "-";
         }
@@ -127,16 +128,17 @@ int main()
             std::cout << "|";
             for (unsigned x = 0; x < fieldSize; x++)
             {
-                field[x][y] = ' ';
+                field[x][y] = ' ';                      // playground
                 std::cout << field[x][y] << field[x][y];
             }
             std::cout << "|";
             std::cout << std::endl;
         }
-        std::cout << " -";
+        std::cout << " -";                          // bottom border gen.
         for (int i = 0; i < fieldSize*2 - 1; ++i) {
             std::cout << "-";
         }
+        std::cout << std::endl;
     }
 
     input_thread.join();
