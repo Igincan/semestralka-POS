@@ -71,7 +71,8 @@ int main()
 
     unsigned fieldSize = 20;
     char field[fieldSize][fieldSize];
-    char border[4*fieldSize];
+    int pohyb = 1;
+    int pohyb2 = 18;
 
     struct input_data input_data =
     {
@@ -128,7 +129,9 @@ int main()
             std::cout << "|";
             for (unsigned x = 0; x < fieldSize; x++)
             {
-                field[x][y] = ' ';                      // playground
+                if (field[x][y] == '.') {
+                    field[x][y] = ' ';                      // playground
+                }
                 std::cout << field[x][y] << field[x][y];
             }
             std::cout << "|";
