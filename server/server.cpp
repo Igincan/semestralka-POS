@@ -13,6 +13,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <vector>
+#include <queue>
 
 #define FIELD_SIZE 20
 
@@ -25,9 +26,10 @@ struct coordinates
 
 struct player_data
 {
+    bool hasLost;
     char direction;
     struct coordinates head;
-    std::vector<struct coordinates> body;
+    std::queue<struct coordinates> body;
 };
 
 struct common_data
@@ -54,6 +56,21 @@ struct client_data
 
     struct common_data* common_data;
 };
+
+char get_opposite_direction(char& direction)
+{
+    switch (direction)
+    {
+    case 'w':
+        return 's';
+     case 'a':
+        return 'd';
+     case 's':
+        return 'w';
+     case 'd':
+        return 'a';
+    }
+}
 
 int main(int argc, char const* argv[])
 {
@@ -195,17 +212,21 @@ int main(int argc, char const* argv[])
                     {
                         {
                             std::unique_lock<std::mutex> lock(thread_data->common_data->mutex);
-                            thread_data->common_data->players_data[thread_data->player_index].direction = input;
+                            char& old_direction = thread_data->common_data->players_data[thread_data->player_index].direction;
+                            if (get_opposite_direction(input) != old_direction)
+                            {
+                                old_direction = input;
+                            }
                         }
-                        std::cout << "client[" << thread_data->client_socket_fd << "]: <" << input << ">" << std::endl;
+                        std::cout << '[' << thread_data->player_index + 1 << "]: <" << input << ">" << std::endl;
                     }
                     else if (input == 'q')
                     {
-                        std::cout << "client[" << thread_data->client_socket_fd << "]: quitting" << std::endl;
+                        std::cout << '[' << thread_data->player_index + 1 << "]: quitting" << std::endl;
                     }
                     else
                     {
-                        std::cout << "client[" << thread_data->client_socket_fd << "]: " << input << std::endl;
+                        std::cout << '[' << thread_data->player_index + 1 << "]: " << input << std::endl;
                     }
                 }
 
@@ -254,8 +275,17 @@ int main(int argc, char const* argv[])
     // game logic
     // initialization
 
+    struct coordinates food =
+    {
+        rand() % FIELD_SIZE,
+        rand() % FIELD_SIZE    
+    };
+
     {
         std::unique_lock<std::mutex> lock(common_data.mutex);
+        memset(common_data.field, ' ', pow(FIELD_SIZE, 2));
+        common_data.field[food.x][food.y] = 'X';
+
         for (unsigned i = 0; i < number_of_players; i++)
         {
             char direction;
@@ -274,24 +304,31 @@ int main(int argc, char const* argv[])
                 direction = 'd';
                 break;
             }
+            struct coordinates coords;
+            do
+            {
+                coords =
+                {
+                    rand() % FIELD_SIZE,
+                    rand() % FIELD_SIZE
+                };
+            } while (common_data.field[coords.x][coords.y] != ' ');
+            
             common_data.players_data.push_back(
             {
+                false,
                 direction,
-                { rand() % FIELD_SIZE, rand() % FIELD_SIZE }
+                coords
             });
-        }
 
-        memset(common_data.field, ' ', pow(FIELD_SIZE, 2));
-        for (unsigned i = 0; i < common_data.players_data.size(); i++)
-        {
-            common_data.field[common_data.players_data[i].head.x][common_data.players_data[i].head.y] = 49 + i;
+            common_data.field[coords.x][coords.y] = 49 + i;
         }
     }
 
     // main cycle
     while (true)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         {
             std::unique_lock<std::mutex> lock(common_data.mutex);
@@ -308,7 +345,11 @@ int main(int argc, char const* argv[])
             for (unsigned i = 0; i < common_data.players_data.size(); i++)
             {
                 struct player_data& player_data = common_data.players_data[i];
-                common_data.field[player_data.head.x][player_data.head.y] = ' ';
+                if (player_data.hasLost)
+                {
+                    continue;
+                }
+                struct coordinates old_head = player_data.head;
                 switch (player_data.direction)
                 {
                 case 'w':
@@ -352,7 +393,45 @@ int main(int argc, char const* argv[])
                     }
                     break;
                 }
-                common_data.field[player_data.head.x][player_data.head.y] = 49 + i;
+                player_data.body.push(old_head);
+                switch (common_data.field[player_data.head.x][player_data.head.y])
+                {
+                case 'X':
+                    {
+                        do
+                        {
+                            food =
+                            {
+                                rand() % FIELD_SIZE,
+                                rand() % FIELD_SIZE
+                            };
+                        } while (common_data.field[food.x][food.y] != ' ');
+                        common_data.field[food.x][food.y] = 'X';
+                    }
+                    break;
+                case ' ':
+                    {
+                        struct coordinates tail = player_data.body.front();
+                        common_data.field[tail.x][tail.y] = ' ';
+                        player_data.body.pop();
+                    }
+                    break;
+                default:
+                    {
+                        player_data.hasLost = true;
+                        while (!player_data.body.empty())
+                        {
+                            struct coordinates body_part = player_data.body.front();
+                            common_data.field[body_part.x][body_part.y] = ' ';
+                            player_data.body.pop();
+                        }
+                    }
+                    break;
+                }
+                if (!player_data.hasLost)
+                {
+                    common_data.field[player_data.head.x][player_data.head.y] = 49 + i;
+                }
             }
 
             common_data.snakes_processed = common_data.number_of_players;
