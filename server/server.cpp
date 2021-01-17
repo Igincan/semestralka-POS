@@ -277,8 +277,8 @@ int main(int argc, char const* argv[])
 
     struct coordinates food =
     {
-        rand() % FIELD_SIZE,
-        rand() % FIELD_SIZE    
+        static_cast<unsigned int>(rand() % FIELD_SIZE),
+        static_cast<unsigned int>(rand() % FIELD_SIZE)
     };
 
     {
@@ -309,8 +309,8 @@ int main(int argc, char const* argv[])
             {
                 coords =
                 {
-                    rand() % FIELD_SIZE,
-                    rand() % FIELD_SIZE
+                    static_cast<unsigned int>(rand() % FIELD_SIZE),
+                    static_cast<unsigned int>(rand() % FIELD_SIZE)
                 };
             } while (common_data.field[coords.x][coords.y] != ' ');
             
@@ -402,8 +402,8 @@ int main(int argc, char const* argv[])
                         {
                             food =
                             {
-                                rand() % FIELD_SIZE,
-                                rand() % FIELD_SIZE
+                                static_cast<unsigned int>(rand() % FIELD_SIZE),
+                                static_cast<unsigned int>(rand() % FIELD_SIZE)
                             };
                         } while (common_data.field[food.x][food.y] != ' ');
                         common_data.field[food.x][food.y] = 'X';
